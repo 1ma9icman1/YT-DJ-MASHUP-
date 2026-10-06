@@ -30,7 +30,8 @@ export interface DeckState {
   volume: number; // 0 to 100
   pitchPercent: number; // -16 to +16
   playbackRate: number; // 0.25 to 2.0
-  bpm: number;
+  bpm: number; // Current effective BPM with pitch applied
+  baseBpm: number; // Unpitched native track BPM
   highEq: number; // -100 to +100 (0 neutral)
   midEq: number; // -100 to +100
   lowEq: number; // -100 to +100
@@ -57,7 +58,7 @@ export interface DeckState {
 
 export type CrossfaderCurve = 'linear' | 'cut' | 'smooth';
 
-export type VideoDisplayMode = 'crossfader' | 'split' | 'pip-a' | 'pip-b' | 'solo-a' | 'solo-b' | 'vinyl';
+export type VideoDisplayMode = 'crossfader' | 'split' | 'pip-a' | 'pip-b' | 'solo-a' | 'solo-b' | 'vinyl' | 'milkdrop';
 
 export type VideoFilter = 'none' | 'crt' | 'neon' | 'noir' | 'strobe';
 

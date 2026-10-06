@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { DeckState, VideoDisplayMode, VideoFilter } from '../types/dj';
 import { formatTimecode } from '../utils/youtube';
-import { Disc, Monitor, Tv, Eye, Layers } from 'lucide-react';
+import { Disc, Monitor, Tv, Eye, Layers, Sparkles } from 'lucide-react';
+import { MilkDropVisualizer } from './MilkDropVisualizer';
 
 interface VideoMashupStageProps {
   deckA: DeckState;
@@ -293,6 +294,23 @@ export const VideoMashupStage: React.FC<VideoMashupStageProps> = ({
               </div>
               <span className="text-xs font-semibold text-amber-400">DECK B (VINYL)</span>
             </div>
+          </div>
+        )}
+
+        {/* MILKDROP 2 WEBGL WINAMP VISUALIZER STAGE */}
+        {videoMode === 'milkdrop' && (
+          <div className="relative w-full h-full">
+            {/* Hidden players running audio in background */}
+            <div className="hidden">
+              {renderDeckAContent()}
+              {renderDeckBContent()}
+            </div>
+            <MilkDropVisualizer
+              deckA={deckA}
+              deckB={deckB}
+              crossfader={crossfader}
+              masterVolume={masterVolume}
+            />
           </div>
         )}
 

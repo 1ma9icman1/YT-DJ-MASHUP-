@@ -295,6 +295,30 @@ class DJAudioEngine {
     osc.start(now);
     osc.stop(now + 0.05);
   }
+
+  // Visualizer / MilkDrop Audio Context & Node Access
+  public getContext(): AudioContext | null {
+    this.initContext();
+    return this.ctx;
+  }
+
+  public getMasterGain(): GainNode | null {
+    this.initContext();
+    return this.masterGain;
+  }
+
+  private visualizerSourceNode: GainNode | null = null;
+
+  public getVisualizerAudioNode(): AudioNode | null {
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return null;
+    if (!this.visualizerSourceNode) {
+      this.visualizerSourceNode = this.ctx.createGain();
+      this.visualizerSourceNode.gain.setValueAtTime(1.0, this.ctx.currentTime);
+      this.masterGain.connect(this.visualizerSourceNode);
+    }
+    return this.visualizerSourceNode;
+  }
 }
 
 export const djAudio = new DJAudioEngine();

@@ -15,6 +15,10 @@ import {
   Plus,
   Minus,
   Upload,
+  Search,
+  FolderOpen,
+  Pencil,
+  Check,
 } from 'lucide-react';
 
 interface DeckControllerProps {
@@ -30,6 +34,8 @@ interface DeckControllerProps {
   onHalveLoop: () => void;
   onDoubleLoop: () => void;
   onPitchChange: (pitchPercent: number) => void;
+  onBpmChange: (newBpm: number) => void;
+  onSetBaseBpm?: (baseBpm: number) => void;
   onSync: () => void;
   onTapBpm: () => void;
   onNudge: (deltaSeconds: number) => void;
@@ -45,6 +51,8 @@ interface DeckControllerProps {
   onToggleHeadphoneCue: () => void;
   isHeadphoneCue: boolean;
   onLoadCustomTrack: () => void;
+  onSearchTrack: () => void;
+  onPushLocalFile?: (file: File) => void;
   onSpinback: () => void;
 }
 
@@ -61,6 +69,8 @@ export const DeckController: React.FC<DeckControllerProps> = ({
   onHalveLoop,
   onDoubleLoop,
   onPitchChange,
+  onBpmChange,
+  onSetBaseBpm,
   onSync,
   onTapBpm,
   onNudge,
@@ -76,6 +86,8 @@ export const DeckController: React.FC<DeckControllerProps> = ({
   onToggleHeadphoneCue,
   isHeadphoneCue,
   onLoadCustomTrack,
+  onSearchTrack,
+  onPushLocalFile,
   onSpinback,
 }) => {
   const isDeckA = deck.id === 'A';
@@ -87,6 +99,21 @@ export const DeckController: React.FC<DeckControllerProps> = ({
 
   // State for Hot Cue clear mode toggle
   const [deleteCueMode, setDeleteCueMode] = useState(false);
+
+  // State for direct BPM adjust input
+  const [isEditingBpm, setIsEditingBpm] = useState(false);
+  const [tempBpmInput, setTempBpmInput] = useState('');
+
+  // Hidden file input for native local audio/video file selection
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLocalFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onPushLocalFile) {
+      onPushLocalFile(file);
+    }
+    if (e.target) e.target.value = '';
+  };
 
   // Platter scratch / jog interaction
   const platterRef = useRef<HTMLDivElement>(null);
@@ -166,9 +193,9 @@ export const DeckController: React.FC<DeckControllerProps> = ({
       className={`flex flex-col bg-zinc-900/90 rounded-xl border ${themeBorder} ${themeBgGlow} p-4 text-zinc-200 select-none backdrop-blur-md`}
     >
       {/* 1. TOP HEADER & TRACK INFO */}
-      <div className="flex items-start justify-between gap-3 border-b border-zinc-800 pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <span
               className={`text-xs font-display font-black tracking-wider uppercase px-2 py-0.5 rounded ${
                 isDeckA ? 'bg-cyan-950 text-cyan-400 border border-cyan-800' : 'bg-amber-950 text-amber-400 border border-amber-800'
@@ -176,9 +203,18 @@ export const DeckController: React.FC<DeckControllerProps> = ({
             >
               DECK {deck.id}
             </span>
-            <span className="text-[11px] font-mono-numbers text-zinc-400 truncate">
-              {deck.bpm.toFixed(1)} BPM
-            </span>
+            {/* Interactive Header BPM Badge */}
+            <button
+              onClick={() => {
+                setTempBpmInput(deck.bpm.toFixed(1));
+                setIsEditingBpm(true);
+              }}
+              className="text-[11px] font-mono-numbers text-zinc-300 hover:text-white bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800 hover:border-zinc-600 flex items-center gap-1 transition-colors cursor-pointer group"
+              title="Click to adjust track BPM"
+            >
+              <span className="font-bold">{deck.bpm.toFixed(1)} BPM</span>
+              <Pencil className="w-2.5 h-2.5 text-zinc-500 group-hover:text-zinc-300" />
+            </button>
             {deck.directStreamUrl ? (
               <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -199,15 +235,51 @@ export const DeckController: React.FC<DeckControllerProps> = ({
           </p>
         </div>
 
-        {/* Load track button */}
-        <button
-          onClick={onLoadCustomTrack}
-          className="shrink-0 px-2.5 py-1.5 text-xs font-medium rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 flex items-center gap-1.5 transition-colors"
-          title="Load custom YouTube URL or Video ID"
-        >
-          <Upload className="w-3.5 h-3.5" />
-          <span>Load</span>
-        </button>
+        {/* Track Actions: Search, Load URL & Push Local with clean, balanced spacing */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Hidden native file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="audio/*,video/*"
+            className="hidden"
+            onChange={handleLocalFileChange}
+          />
+
+          {/* Search track button */}
+          <button
+            onClick={onSearchTrack}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 transition-all shadow-sm ${
+              isDeckA
+                ? 'bg-cyan-950/90 hover:bg-cyan-900 text-cyan-300 border-cyan-700 hover:border-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
+                : 'bg-amber-950/90 hover:bg-amber-900 text-amber-300 border-amber-700 hover:border-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.3)]'
+            }`}
+            title={`Search YouTube tracks & mashups for Deck ${deck.id}`}
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span>Search</span>
+          </button>
+
+          {/* Load URL button */}
+          <button
+            onClick={onLoadCustomTrack}
+            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 hover:border-zinc-500 flex items-center gap-1.5 transition-all shadow-sm"
+            title="Load custom YouTube URL or Video ID"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Load</span>
+          </button>
+
+          {/* Push Local file button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800/80 hover:bg-emerald-950 text-emerald-400 hover:text-emerald-300 border border-zinc-700 hover:border-emerald-600 flex items-center gap-1.5 transition-all shadow-sm"
+            title={`Push local audio/video file directly into Deck ${deck.id}`}
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+            <span>Local</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. PROGRESS / TIMELINE STRIP */}
@@ -347,7 +419,7 @@ export const DeckController: React.FC<DeckControllerProps> = ({
         {/* RIGHT COLUMN: CHANNEL STRIP (EQ, FILTER, PITCH, VOLUME) (5 COLS) */}
         <div className="col-span-12 lg:col-span-4 flex flex-col justify-between bg-zinc-950/60 p-3 rounded-lg border border-zinc-800/80 gap-3">
           {/* 3-BAND EQ & FILTER */}
-          <div className="grid grid-cols-4 gap-1.5 items-center justify-items-center">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-2 gap-2 items-center justify-items-center">
             {/* HIGH EQ */}
             <div className="flex flex-col items-center">
               <RotaryKnob
@@ -427,15 +499,80 @@ export const DeckController: React.FC<DeckControllerProps> = ({
             </div>
           </div>
 
-          {/* TEMPO / PITCH & SYNC ROW */}
-          <div className="flex flex-col gap-1.5 border-t border-zinc-800/80 pt-2">
+          {/* TEMPO & BPM ADJUST ENGINE */}
+          <div className="flex flex-col gap-2 border-t border-zinc-800/80 pt-2.5">
+            {/* 1. Header: Live BPM Display / Direct Input & Beat SYNC */}
             <div className="flex items-center justify-between text-xs font-mono-numbers">
-              <span className="text-zinc-400">PITCH: {deck.pitchPercent > 0 ? `+${deck.pitchPercent}%` : `${deck.pitchPercent}%`}</span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider shrink-0">
+                  TEMPO:
+                </span>
+                {isEditingBpm ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const val = parseFloat(tempBpmInput);
+                      if (!isNaN(val) && val >= 30 && val <= 300) {
+                        onBpmChange(val);
+                      }
+                      setIsEditingBpm(false);
+                    }}
+                    className="flex items-center gap-1"
+                  >
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="30"
+                      max="300"
+                      value={tempBpmInput}
+                      onChange={(e) => setTempBpmInput(e.target.value)}
+                      autoFocus
+                      className="w-16 px-1.5 py-0.5 bg-zinc-950 border border-cyan-400 rounded text-xs text-white font-mono focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      className="px-1.5 py-0.5 bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-bold rounded"
+                      title="Apply BPM"
+                    >
+                      <Check className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingBpm(false)}
+                      className="px-1 py-0.5 text-zinc-400 hover:text-white text-[10px]"
+                    >
+                      ✕
+                    </button>
+                  </form>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setTempBpmInput(deck.bpm.toFixed(1));
+                      setIsEditingBpm(true);
+                    }}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 transition-colors group cursor-text"
+                    title="Click to type exact BPM value"
+                  >
+                    <span className={`text-xs font-black font-mono-numbers ${themeText}`}>
+                      {deck.bpm.toFixed(1)}
+                    </span>
+                    <span className="text-[10px] text-zinc-400 font-bold">BPM</span>
+                    <Pencil className="w-2.5 h-2.5 text-zinc-500 group-hover:text-zinc-300 ml-0.5" />
+                  </button>
+                )}
+                {deck.pitchPercent !== 0 && (
+                  <span className="text-[10px] font-mono text-zinc-500 truncate">
+                    ({deck.pitchPercent > 0 ? `+${deck.pitchPercent.toFixed(1)}%` : `${deck.pitchPercent.toFixed(1)}%`})
+                  </span>
+                )}
+              </div>
+
+              {/* BEAT SYNC BUTTON */}
               <button
                 onClick={onSync}
-                className={`px-2.5 py-1 text-xs font-bold rounded uppercase tracking-wider transition-all ${
+                className={`px-2 py-0.5 text-[11px] font-bold rounded uppercase tracking-wider transition-all shrink-0 ${
                   Math.abs(deck.bpm - otherDeck.bpm) < 0.2
-                    ? 'bg-emerald-500 text-black shadow-[0_0_8px_#10b981]'
+                    ? 'bg-emerald-500 text-black shadow-[0_0_8px_#10b981] font-black'
                     : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700'
                 }`}
                 title={`Beat Sync: Match tempo to Deck ${otherDeck.id} (${otherDeck.bpm.toFixed(1)} BPM)`}
@@ -444,14 +581,72 @@ export const DeckController: React.FC<DeckControllerProps> = ({
               </button>
             </div>
 
-            {/* Pitch slider */}
+            {/* 2. BPM Adjust Steppers & Rhythm Multipliers */}
+            <div className="flex items-center justify-between gap-1 bg-zinc-950/70 px-1.5 py-1 rounded border border-zinc-800/80">
+              <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-tight shrink-0">
+                ADJUST:
+              </span>
+              <div className="flex items-center gap-1 flex-wrap justify-end">
+                <button
+                  onClick={() => onBpmChange(deck.bpm - 1.0)}
+                  className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 active:scale-95 transition-transform"
+                  title="Step down 1.0 BPM"
+                >
+                  -1
+                </button>
+                <button
+                  onClick={() => onBpmChange(deck.bpm - 0.1)}
+                  className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 active:scale-95 transition-transform"
+                  title="Fine step down 0.1 BPM"
+                >
+                  -0.1
+                </button>
+                <button
+                  onClick={() => onBpmChange(deck.bpm + 0.1)}
+                  className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 active:scale-95 transition-transform"
+                  title="Fine step up 0.1 BPM"
+                >
+                  +0.1
+                </button>
+                <button
+                  onClick={() => onBpmChange(deck.bpm + 1.0)}
+                  className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 active:scale-95 transition-transform"
+                  title="Step up 1.0 BPM"
+                >
+                  +1
+                </button>
+                <button
+                  onClick={() => onBpmChange(deck.bpm / 2)}
+                  className="px-1 py-0.5 text-[10px] font-mono rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border border-zinc-800 active:scale-95"
+                  title="Halve BPM (/2)"
+                >
+                  /2
+                </button>
+                <button
+                  onClick={() => onBpmChange(deck.bpm * 2)}
+                  className="px-1 py-0.5 text-[10px] font-mono rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border border-zinc-800 active:scale-95"
+                  title="Double BPM (x2)"
+                >
+                  x2
+                </button>
+                <button
+                  onClick={() => onBpmChange(deck.baseBpm || 120)}
+                  className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 active:scale-95"
+                  title="Reset to native unpitched BPM"
+                >
+                  RST
+                </button>
+              </div>
+            </div>
+
+            {/* 3. Pitch Slider with Center Reset */}
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-zinc-500 font-mono">-16%</span>
               <input
                 type="range"
                 min={-16}
                 max={16}
-                step={0.5}
+                step={0.1}
                 value={deck.pitchPercent}
                 onChange={(e) => onPitchChange(parseFloat(e.target.value))}
                 className="w-full accent-cyan-400 h-1.5 bg-zinc-800 rounded-lg cursor-pointer"
@@ -459,10 +654,10 @@ export const DeckController: React.FC<DeckControllerProps> = ({
               <span className="text-[10px] text-zinc-500 font-mono">+16%</span>
               <button
                 onClick={() => onPitchChange(0)}
-                className="text-[10px] px-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-400"
-                title="Reset Pitch to 0%"
+                className="text-[10px] px-1.5 py-0.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-400 border border-zinc-700 font-mono active:scale-95"
+                title="Reset Pitch Fader to 0%"
               >
-                0
+                0%
               </button>
             </div>
           </div>

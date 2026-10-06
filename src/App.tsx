@@ -20,6 +20,7 @@ import { SingleTrackLoaderModal } from './components/SingleTrackLoaderModal';
 import { SessionRecorderModal } from './components/SessionRecorderModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { YtDownloaderModal } from './components/YtDownloaderModal';
+import { TrackSearchModal } from './components/TrackSearchModal';
 
 const initialDeckA: DeckState = {
   id: 'A',
@@ -35,6 +36,7 @@ const initialDeckA: DeckState = {
   pitchPercent: 0,
   playbackRate: 1.0,
   bpm: DEFAULT_MASHUP_PRESETS[0].deckA.bpm,
+  baseBpm: DEFAULT_MASHUP_PRESETS[0].deckA.bpm,
   highEq: 0,
   midEq: 0,
   lowEq: 0,
@@ -69,6 +71,7 @@ const initialDeckB: DeckState = {
   pitchPercent: 0,
   playbackRate: 1.0,
   bpm: DEFAULT_MASHUP_PRESETS[0].deckB.bpm,
+  baseBpm: DEFAULT_MASHUP_PRESETS[0].deckB.bpm,
   highEq: 0,
   midEq: 0,
   lowEq: 0,
@@ -112,6 +115,7 @@ export default function App() {
   const [isRecorderOpen, setIsRecorderOpen] = useState<boolean>(false);
   const [isDownloaderOpen, setIsDownloaderOpen] = useState<boolean>(false);
   const [singleLoadDeck, setSingleLoadDeck] = useState<'A' | 'B' | null>(null);
+  const [searchDeck, setSearchDeck] = useState<'A' | 'B' | null>(null);
 
   // Session Logger
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -511,11 +515,13 @@ export default function App() {
 
   const handlePitchChangeA = (pitchPercent: number) => {
     const rate = 1 + pitchPercent / 100;
+    const base = deckA.baseBpm || DEFAULT_MASHUP_PRESETS[0].deckA.bpm || 120;
+    const newBpm = Math.round(base * rate * 10) / 10;
     setDeckA((prev) => ({
       ...prev,
       pitchPercent,
       playbackRate: rate,
-      bpm: (DEFAULT_MASHUP_PRESETS[0].deckA.bpm || 120) * rate,
+      bpm: newBpm,
     }));
     if (deckA.directStreamUrl && videoRefA.current) {
       videoRefA.current.playbackRate = Math.max(0.25, Math.min(2.0, rate));
@@ -527,12 +533,47 @@ export default function App() {
     }
   };
 
+  const handleBpmChangeA = (newBpm: number) => {
+    const base = deckA.baseBpm || DEFAULT_MASHUP_PRESETS[0].deckA.bpm || 120;
+    const targetBpm = Math.max(30, Math.min(300, Math.round(newBpm * 10) / 10));
+    const pitch = ((targetBpm - base) / base) * 100;
+    const clampedPitch = Math.max(-50, Math.min(50, Math.round(pitch * 10) / 10));
+    const rate = Math.max(0.25, Math.min(2.0, targetBpm / base));
+
+    setDeckA((prev) => ({
+      ...prev,
+      bpm: targetBpm,
+      pitchPercent: clampedPitch,
+      playbackRate: rate,
+    }));
+    if (deckA.directStreamUrl && videoRefA.current) {
+      videoRefA.current.playbackRate = rate;
+    }
+    if (playerARef.current && typeof playerARef.current.setPlaybackRate === 'function') {
+      try {
+        playerARef.current.setPlaybackRate(rate);
+      } catch {}
+    }
+    logMixEvent(`Adjusted Deck A BPM to ${targetBpm.toFixed(1)} (${clampedPitch > 0 ? '+' : ''}${clampedPitch.toFixed(1)}%)`, 'A');
+  };
+
+  const handleSetBaseBpmA = (newBaseBpm: number) => {
+    const clamped = Math.max(30, Math.min(300, Math.round(newBaseBpm * 10) / 10));
+    setDeckA((prev) => {
+      const rate = 1 + prev.pitchPercent / 100;
+      return {
+        ...prev,
+        baseBpm: clamped,
+        bpm: Math.round(clamped * rate * 10) / 10,
+      };
+    });
+    logMixEvent(`Calibrated Deck A Base BPM to ${clamped.toFixed(1)}`, 'A');
+  };
+
   const handleSyncA = () => {
     // Match BPM to Deck B
     const targetBpm = deckB.bpm;
-    const baseBpm = DEFAULT_MASHUP_PRESETS[0].deckA.bpm || 120;
-    const pitch = ((targetBpm - baseBpm) / baseBpm) * 100;
-    handlePitchChangeA(Math.round(pitch * 10) / 10);
+    handleBpmChangeA(targetBpm);
     logMixEvent(`Synced Deck A to Deck B (${targetBpm.toFixed(1)} BPM)`, 'A');
   };
 
@@ -548,8 +589,13 @@ export default function App() {
       }
       const avgDiff = diffs.reduce((a, b) => a + b, 0) / diffs.length;
       const detectedBpm = Math.round((60000 / avgDiff) * 10) / 10;
-      if (detectedBpm >= 60 && detectedBpm <= 200) {
-        setDeckA((prev) => ({ ...prev, bpm: detectedBpm }));
+      if (detectedBpm >= 40 && detectedBpm <= 240) {
+        setDeckA((prev) => ({
+          ...prev,
+          baseBpm: detectedBpm,
+          bpm: Math.round(detectedBpm * (1 + prev.pitchPercent / 100) * 10) / 10,
+        }));
+        logMixEvent(`Detected Deck A Tap Tempo: ${detectedBpm} BPM`, 'A');
       }
     }
   };
@@ -708,11 +754,13 @@ export default function App() {
 
   const handlePitchChangeB = (pitchPercent: number) => {
     const rate = 1 + pitchPercent / 100;
+    const base = deckB.baseBpm || DEFAULT_MASHUP_PRESETS[0].deckB.bpm || 114;
+    const newBpm = Math.round(base * rate * 10) / 10;
     setDeckB((prev) => ({
       ...prev,
       pitchPercent,
       playbackRate: rate,
-      bpm: (DEFAULT_MASHUP_PRESETS[0].deckB.bpm || 114) * rate,
+      bpm: newBpm,
     }));
     if (deckB.directStreamUrl && videoRefB.current) {
       videoRefB.current.playbackRate = Math.max(0.25, Math.min(2.0, rate));
@@ -724,12 +772,47 @@ export default function App() {
     }
   };
 
+  const handleBpmChangeB = (newBpm: number) => {
+    const base = deckB.baseBpm || DEFAULT_MASHUP_PRESETS[0].deckB.bpm || 114;
+    const targetBpm = Math.max(30, Math.min(300, Math.round(newBpm * 10) / 10));
+    const pitch = ((targetBpm - base) / base) * 100;
+    const clampedPitch = Math.max(-50, Math.min(50, Math.round(pitch * 10) / 10));
+    const rate = Math.max(0.25, Math.min(2.0, targetBpm / base));
+
+    setDeckB((prev) => ({
+      ...prev,
+      bpm: targetBpm,
+      pitchPercent: clampedPitch,
+      playbackRate: rate,
+    }));
+    if (deckB.directStreamUrl && videoRefB.current) {
+      videoRefB.current.playbackRate = rate;
+    }
+    if (playerBRef.current && typeof playerBRef.current.setPlaybackRate === 'function') {
+      try {
+        playerBRef.current.setPlaybackRate(rate);
+      } catch {}
+    }
+    logMixEvent(`Adjusted Deck B BPM to ${targetBpm.toFixed(1)} (${clampedPitch > 0 ? '+' : ''}${clampedPitch.toFixed(1)}%)`, 'B');
+  };
+
+  const handleSetBaseBpmB = (newBaseBpm: number) => {
+    const clamped = Math.max(30, Math.min(300, Math.round(newBaseBpm * 10) / 10));
+    setDeckB((prev) => {
+      const rate = 1 + prev.pitchPercent / 100;
+      return {
+        ...prev,
+        baseBpm: clamped,
+        bpm: Math.round(clamped * rate * 10) / 10,
+      };
+    });
+    logMixEvent(`Calibrated Deck B Base BPM to ${clamped.toFixed(1)}`, 'B');
+  };
+
   const handleSyncB = () => {
     // Match BPM to Deck A
     const targetBpm = deckA.bpm;
-    const baseBpm = DEFAULT_MASHUP_PRESETS[0].deckB.bpm || 114;
-    const pitch = ((targetBpm - baseBpm) / baseBpm) * 100;
-    handlePitchChangeB(Math.round(pitch * 10) / 10);
+    handleBpmChangeB(targetBpm);
     logMixEvent(`Synced Deck B to Deck A (${targetBpm.toFixed(1)} BPM)`, 'B');
   };
 
@@ -745,8 +828,13 @@ export default function App() {
       }
       const avgDiff = diffs.reduce((a, b) => a + b, 0) / diffs.length;
       const detectedBpm = Math.round((60000 / avgDiff) * 10) / 10;
-      if (detectedBpm >= 60 && detectedBpm <= 200) {
-        setDeckB((prev) => ({ ...prev, bpm: detectedBpm }));
+      if (detectedBpm >= 40 && detectedBpm <= 240) {
+        setDeckB((prev) => ({
+          ...prev,
+          baseBpm: detectedBpm,
+          bpm: Math.round(detectedBpm * (1 + prev.pitchPercent / 100) * 10) / 10,
+        }));
+        logMixEvent(`Detected Deck B Tap Tempo: ${detectedBpm} BPM`, 'B');
       }
     }
   };
@@ -826,6 +914,7 @@ export default function App() {
       title: preset.deckA.title,
       artist: preset.deckA.artist,
       bpm: preset.deckA.bpm,
+      baseBpm: preset.deckA.bpm,
       cuePoint: preset.deckA.cuePoint || 0,
       pitchPercent: 0,
       currentTime: 0,
@@ -845,6 +934,7 @@ export default function App() {
       title: preset.deckB.title,
       artist: preset.deckB.artist,
       bpm: preset.deckB.bpm,
+      baseBpm: preset.deckB.bpm,
       cuePoint: preset.deckB.cuePoint || 0,
       pitchPercent: 0,
       currentTime: 0,
@@ -870,6 +960,7 @@ export default function App() {
       videoId: deckAData.videoId,
       title: deckAData.title,
       bpm: deckAData.bpm,
+      baseBpm: deckAData.bpm,
       currentTime: 0,
       isPlaying: false,
     }));
@@ -885,6 +976,7 @@ export default function App() {
       videoId: deckBData.videoId,
       title: deckBData.title,
       bpm: deckBData.bpm,
+      baseBpm: deckBData.bpm,
       currentTime: 0,
       isPlaying: false,
     }));
@@ -904,6 +996,7 @@ export default function App() {
         videoId: trackData.videoId,
         title: trackData.title,
         bpm: trackData.bpm,
+        baseBpm: trackData.bpm,
         currentTime: 0,
         isPlaying: false,
         directStreamUrl: null,
@@ -921,6 +1014,7 @@ export default function App() {
         videoId: trackData.videoId,
         title: trackData.title,
         bpm: trackData.bpm,
+        baseBpm: trackData.bpm,
         currentTime: 0,
         isPlaying: false,
         directStreamUrl: null,
@@ -997,6 +1091,75 @@ export default function App() {
       })`,
       deckId
     );
+  };
+
+  // --- LOAD TRACK FROM SEARCH MODAL ---
+  const handleSelectSearchResult = (trackData: {
+    videoId: string;
+    title: string;
+    bpm: number;
+    thumbnail?: string;
+    artist?: string;
+  }) => {
+    if (searchDeck === 'A') {
+      setDeckA((prev) => ({
+        ...prev,
+        videoId: trackData.videoId,
+        title: trackData.title,
+        artist: trackData.artist || 'YouTube Audio',
+        thumbnail: trackData.thumbnail || prev.thumbnail,
+        bpm: trackData.bpm,
+        baseBpm: trackData.bpm,
+        currentTime: 0,
+        isPlaying: false,
+        directStreamUrl: null,
+      }));
+      if (playerARef.current && typeof playerARef.current.loadVideoById === 'function') {
+        try {
+          playerARef.current.loadVideoById(trackData.videoId);
+          playerARef.current.pauseVideo();
+        } catch {}
+      }
+      logMixEvent(`Loaded track from search into Deck A: ${trackData.title}`, 'A');
+    } else if (searchDeck === 'B') {
+      setDeckB((prev) => ({
+        ...prev,
+        videoId: trackData.videoId,
+        title: trackData.title,
+        artist: trackData.artist || 'YouTube Audio',
+        thumbnail: trackData.thumbnail || prev.thumbnail,
+        bpm: trackData.bpm,
+        baseBpm: trackData.bpm,
+        currentTime: 0,
+        isPlaying: false,
+        directStreamUrl: null,
+      }));
+      if (playerBRef.current && typeof playerBRef.current.loadVideoById === 'function') {
+        try {
+          playerBRef.current.loadVideoById(trackData.videoId);
+          playerBRef.current.pauseVideo();
+        } catch {}
+      }
+      logMixEvent(`Loaded track from search into Deck B: ${trackData.title}`, 'B');
+    }
+    setSearchDeck(null);
+  };
+
+  // --- DIRECT LOCAL MEDIA FILE PUSH TO DECK ---
+  const handlePushLocalFile = (deckId: 'A' | 'B', file: File) => {
+    const objectUrl = URL.createObjectURL(file);
+    handleLoadFromDownloader(deckId, {
+      videoId: `local_${Date.now()}`,
+      title: file.name.replace(/\.[^/.]+$/, ''),
+      artist: 'Local Media File',
+      thumbnail: '',
+      duration: 0,
+      directStreamUrl: objectUrl,
+      isLocalFile: true,
+      formats: [],
+      ytdlpCommand: `# Local file loaded: ${file.name}`,
+    });
+    logMixEvent(`Pushed local media file "${file.name}" to Deck ${deckId}`, deckId);
   };
 
   // --- GLOBAL KEYBOARD SHORTCUTS ---
@@ -1128,8 +1291,8 @@ export default function App() {
 
           {/* DUAL DECK & MIXER HARDWARE WORKSTATION */}
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
-            {/* DECK A CONTROLLER (5 COLS) */}
-            <div className="xl:col-span-5">
+            {/* DECK A CONTROLLER (4 COLS on XL = 33.3% width) */}
+            <div className="xl:col-span-4">
               <DeckController
                 deck={deckA}
                 otherDeck={deckB}
@@ -1143,6 +1306,8 @@ export default function App() {
                 onHalveLoop={handleHalveLoopA}
                 onDoubleLoop={handleDoubleLoopA}
                 onPitchChange={handlePitchChangeA}
+                onBpmChange={handleBpmChangeA}
+                onSetBaseBpm={handleSetBaseBpmA}
                 onSync={handleSyncA}
                 onTapBpm={handleTapBpmA}
                 onNudge={handleNudgeA}
@@ -1158,12 +1323,14 @@ export default function App() {
                 onToggleHeadphoneCue={() => setCueDeckA(!cueDeckA)}
                 isHeadphoneCue={cueDeckA}
                 onLoadCustomTrack={() => setSingleLoadDeck('A')}
+                onSearchTrack={() => setSearchDeck('A')}
+                onPushLocalFile={(file) => handlePushLocalFile('A', file)}
                 onSpinback={handleSpinbackA}
               />
             </div>
 
-            {/* CENTRAL MIXER SECTION (2 COLS on XL, expanded on mobile/tablet) */}
-            <div className="xl:col-span-2">
+            {/* CENTRAL MIXER SECTION (4 COLS on XL = 33.3% width) */}
+            <div className="xl:col-span-4">
               <MixerSection
                 crossfader={crossfader}
                 onCrossfaderChange={setCrossfader}
@@ -1184,8 +1351,8 @@ export default function App() {
               />
             </div>
 
-            {/* DECK B CONTROLLER (5 COLS) */}
-            <div className="xl:col-span-5">
+            {/* DECK B CONTROLLER (4 COLS on XL = 33.3% width) */}
+            <div className="xl:col-span-4">
               <DeckController
                 deck={deckB}
                 otherDeck={deckA}
@@ -1199,6 +1366,8 @@ export default function App() {
                 onHalveLoop={handleHalveLoopB}
                 onDoubleLoop={handleDoubleLoopB}
                 onPitchChange={handlePitchChangeB}
+                onBpmChange={handleBpmChangeB}
+                onSetBaseBpm={handleSetBaseBpmB}
                 onSync={handleSyncB}
                 onTapBpm={handleTapBpmB}
                 onNudge={handleNudgeB}
@@ -1214,6 +1383,8 @@ export default function App() {
                 onToggleHeadphoneCue={() => setCueDeckB(!cueDeckB)}
                 isHeadphoneCue={cueDeckB}
                 onLoadCustomTrack={() => setSingleLoadDeck('B')}
+                onSearchTrack={() => setSearchDeck('B')}
+                onPushLocalFile={(file) => handlePushLocalFile('B', file)}
                 onSpinback={handleSpinbackB}
               />
             </div>
@@ -1281,6 +1452,14 @@ export default function App() {
         isOpen={isDownloaderOpen}
         onClose={() => setIsDownloaderOpen(false)}
         onLoadToDeck={handleLoadFromDownloader}
+      />
+
+      {/* YouTube Track & Mashup Search Modal */}
+      <TrackSearchModal
+        isOpen={searchDeck !== null}
+        deckId={searchDeck || 'A'}
+        onClose={() => setSearchDeck(null)}
+        onSelectTrack={handleSelectSearchResult}
       />
     </div>
   );
