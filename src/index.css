@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .font-display {
+    font-family: 'Syne', sans-serif;
+  }
+
+  .font-mono-numbers {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Custom DJ Faders & Knobs */
+input[type="range"].dj-slider-vert {
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  writing-mode: bt-lr; /* IE/Edge */
+}
+
+/* Horizontal crossfader slider */
+input[type="range"].crossfader-input {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"].crossfader-input::-webkit-slider-runnable-track {
+  height: 8px;
+  background: #18181b;
+  border-radius: 4px;
+  border: 1px solid #27272a;
+}
+
+input[type="range"].crossfader-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 48px;
+  background: linear-gradient(180deg, #3f3f46 0%, #18181b 50%, #27272a 100%);
+  border: 2px solid #52525b;
+  border-radius: 4px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  margin-top: -20px;
+  position: relative;
+  cursor: grab;
+}
+
+input[type="range"].crossfader-input:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  border-color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
+}
+
+/* Vinyl concentric grooves */
+.vinyl-grooves {
+  background: radial-gradient(
+    circle at center,
+    #18181b 0%,
+    #09090b 20%,
+    #18181b 20.5%,
+    #09090b 35%,
+    #18181b 35.5%,
+    #09090b 50%,
+    #18181b 50.5%,
+    #09090b 65%,
+    #18181b 65.5%,
+    #09090b 80%,
+    #18181b 80.5%,
+    #050507 98%
+  );
+}
+
+.vinyl-sheen {
+  background: conic-gradient(
+    from 45deg at 50% 50%,
+    rgba(255, 255, 255, 0.08) 0deg,
+    transparent 60deg,
+    rgba(255, 255, 255, 0.12) 180deg,
+    transparent 240deg,
+    rgba(255, 255, 255, 0.08) 360deg
+  );
+}
+
+/* Strobe marks around turntable platter */
+.strobe-ring {
+  background: repeating-conic-gradient(
+    from 0deg,
+    #27272a 0deg 1.5deg,
+    #09090b 1.5deg 3deg
+  );
+}
+
+/* CRT scanlines effect */
+.crt-scanlines {
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.25) 50%
+  );
+  background-size: 100% 4px;
+}
+

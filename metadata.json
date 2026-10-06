@@ -1,0 +1,7 @@
+{
+  "name": "DJ YouTube Mashup Studio",
+  "description": "Professional dual-deck DJ controller and video mashup station for YouTube videos with crossfader, jog wheels, beat sync, cue points, FX pads, and audio visualizer.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
